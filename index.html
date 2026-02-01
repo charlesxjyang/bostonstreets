@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Same Address, Different Place — Greater Boston</title>
+<script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f4f1eb;
+    --rule: #d4cfc6;
+    --caption: #8a8578;
+    --body: #3d3a33;
+    --accent: #c0392b;
+    --accent-light: rgba(192, 57, 43, 0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Newsreader', Georgia, serif;
+    background: var(--ink);
+    color: var(--body);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #deck-canvas { position: absolute; inset: 0; }
+
+  .masthead {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: linear-gradient(to bottom, rgba(26,26,46,0.92) 0%, rgba(26,26,46,0.7) 70%, transparent 100%);
+    padding: 28px 36px 48px;
+    pointer-events: none;
+  }
+
+  .masthead-rule { width: 60px; height: 3px; background: var(--accent); margin-bottom: 14px; }
+
+  .masthead h1 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 28px; font-weight: 600; color: var(--paper);
+    line-height: 1.2; margin-bottom: 8px; letter-spacing: -0.3px;
+  }
+
+  .masthead .dek {
+    font-style: italic; font-size: 15px; color: var(--rule);
+    line-height: 1.5; max-width: 520px;
+  }
+
+  .masthead .stat-bar { display: flex; gap: 32px; margin-top: 16px; }
+
+  .stat-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 500; color: var(--paper); line-height: 1;
+  }
+
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--caption); margin-top: 4px;
+  }
+
+  .panel {
+    position: absolute; top: 20px; right: 20px; bottom: 20px;
+    width: 360px; background: var(--paper); border-radius: 3px;
+    z-index: 200; display: flex; flex-direction: column;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    transition: transform 0.3s ease; overflow: hidden;
+  }
+
+  .panel.collapsed { transform: translateX(calc(100% + 40px)); }
+
+  .panel-toggle {
+    position: absolute; top: 50%; right: 20px; transform: translateY(-50%);
+    z-index: 201; width: 36px; height: 36px; background: var(--paper);
+    border: none; border-radius: 3px; cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3); font-size: 16px; color: var(--body);
+  }
+
+  .panel.collapsed ~ .panel-toggle { display: flex; }
+
+  .panel-header { padding: 20px 20px 0; }
+
+  .panel-title {
+    font-size: 11px; font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase; letter-spacing: 1.5px; color: var(--caption); margin-bottom: 12px;
+  }
+
+  .panel-search {
+    width: 100%; padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    border: 1px solid var(--rule); border-radius: 2px;
+    background: white; color: var(--body); outline: none;
+  }
+
+  .panel-search:focus { border-color: var(--accent); }
+  .panel-search::placeholder { color: var(--rule); }
+
+  .panel-divider { height: 1px; background: var(--rule); margin: 14px 20px 0; }
+
+  .panel-list {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+    scrollbar-width: thin; scrollbar-color: var(--rule) transparent;
+  }
+
+  .panel-item {
+    padding: 10px 20px; cursor: pointer;
+    border-left: 3px solid transparent; transition: background 0.12s;
+  }
+
+  .panel-item:hover { background: var(--accent-light); }
+  .panel-item.active { background: var(--accent-light); border-left-color: var(--accent); }
+
+  .panel-item-address {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 500; color: var(--ink); margin-bottom: 2px;
+  }
+
+  .panel-item-meta { font-size: 12px; font-style: italic; color: var(--caption); }
+  .panel-item-meta em { font-style: normal; color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  .panel-footer {
+    padding: 14px 20px; border-top: 1px solid var(--rule);
+    font-size: 11px; color: var(--caption); font-style: italic;
+  }
+
+  .detail-card {
+    display: none; padding: 16px 20px; background: white; border-top: 1px solid var(--rule);
+  }
+
+  .detail-card.visible { display: block; }
+
+  .detail-card h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 500; color: var(--accent); margin-bottom: 10px;
+  }
+
+  .detail-location { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12px; cursor: pointer; border-radius: 2px; padding: 6px 4px; transition: background 0.12s; }
+  .detail-location:hover { background: var(--accent-light); }
+  .detail-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .detail-zip { color: var(--caption); margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  .tooltip {
+    position: absolute; z-index: 300; background: var(--ink); color: var(--paper);
+    padding: 10px 14px; border-radius: 3px; pointer-events: none;
+    font-size: 12px; max-width: 280px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    display: none; border-left: 3px solid var(--accent);
+  }
+
+  .tooltip.visible { display: block; }
+
+  .tooltip-address { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; margin-bottom: 4px; }
+  .tooltip-detail { font-style: italic; font-size: 12px; color: var(--rule); }
+
+  .panel-close {
+    position: absolute; top: 16px; right: 16px; width: 28px; height: 28px;
+    background: none; border: 1px solid var(--rule); border-radius: 2px;
+    cursor: pointer; font-size: 14px; color: var(--caption);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .panel-close:hover { color: var(--accent); border-color: var(--accent); }
+
+  @media (max-width: 768px) {
+    .masthead { padding: 16px 20px 36px; }
+    .masthead h1 { font-size: 20px; }
+    .masthead .dek { font-size: 13px; }
+    .stat-num { font-size: 18px; }
+    .panel { top: auto; right: 0; bottom: 0; left: 0; width: 100%; height: 45vh; border-radius: 12px 12px 0 0; }
+    .panel.collapsed { transform: translateY(calc(100% + 20px)); }
+    .panel-toggle { top: auto; bottom: 20px; right: 50%; transform: translateX(50%); }
+  }
+
+  .loading-screen {
+    position: fixed; inset: 0; background: var(--ink); z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    transition: opacity 0.5s;
+  }
+
+  .loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+  .loading-bar { width: 120px; height: 2px; background: rgba(244,241,235,0.1); border-radius: 1px; overflow: hidden; }
+
+  .loading-bar-fill {
+    height: 100%; width: 40%; background: var(--accent); border-radius: 1px;
+    animation: lslide 1s ease-in-out infinite;
+  }
+
+  @keyframes lslide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+
+  .loading-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--caption);
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loading">
+  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+  <div class="loading-text">Loading addresses</div>
+</div>
+
+<div id="deck-canvas"></div>
+
+<div class="masthead">
+  <div class="masthead-rule"></div>
+  <h1>Same Address, Different Place</h1>
+  <div class="dek">Mapping the duplicate street addresses of Greater Boston — where the same house number and street name appear in multiple cities and zip codes.</div>
+  <div class="stat-bar">
+    <div class="stat-block"><div class="stat-num" id="s-total">—</div><div class="stat-label">Duplicate addresses</div></div>
+    <div class="stat-block"><div class="stat-num" id="s-points">—</div><div class="stat-label">Map points</div></div>
+    <div class="stat-block"><div class="stat-num" id="s-max">—</div><div class="stat-label">Most duplicated</div></div>
+  </div>
+</div>
+
+<div class="panel" id="panel">
+  <button class="panel-close" id="panel-close">✕</button>
+  <div class="panel-header">
+    <div class="panel-title">Duplicate Addresses</div>
+    <input class="panel-search" id="search" type="text" placeholder="Search street name..." />
+  </div>
+  <div class="panel-divider"></div>
+  <div class="panel-list" id="panel-list"></div>
+  <div class="detail-card" id="detail-card">
+    <h3 id="detail-title"></h3>
+    <div id="detail-locations"></div>
+  </div>
+  <div class="panel-footer" id="panel-footer"></div>
+</div>
+
+<button class="panel-toggle" id="panel-toggle">☰</button>
+
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-address" id="tooltip-address"></div>
+  <div class="tooltip-detail" id="tooltip-detail"></div>
+</div>
+
+<script>
+const PALETTE = [[192,57,43],[36,113,163],[39,174,96],[142,68,173],[230,126,34],[22,160,133],[211,84,0],[41,128,185]];
+const PALETTE_HEX = ['#c0392b','#2471a3','#27ae60','#8e44ad','#e67e22','#16a085','#d35400','#2980b9'];
+
+let DATA = null, points = [], addressIndex = {}, highlightedAddress = null, lockedAddress = null, deckgl = null;
+
+async function loadData() {
+  for (const path of ['duplicate_addresses.json', 'data/duplicate_addresses.json']) {
+    try { const r = await fetch(path); if (r.ok) return await r.json(); } catch(e) {}
+  }
+  return null;
+}
+
+async function init() {
+  DATA = await loadData();
+  if (!DATA) {
+    document.getElementById('loading').innerHTML = '<div class="loading-text">Could not load duplicate_addresses.json</div>';
+    return;
+  }
+
+  let totalPoints = 0;
+  DATA.duplicates.forEach((entry, aIdx) => {
+    addressIndex[entry.address] = [];
+    entry.locations.forEach((loc, lIdx) => {
+      if (loc.lat == null || loc.lon == null) return;
+      const pIdx = points.length;
+      points.push({
+        position: [loc.lon, loc.lat],
+        address: entry.address,
+        aIdx, lIdx,
+        city: loc.city,
+        postcode: loc.postcode,
+        count: entry.count,
+      });
+      addressIndex[entry.address].push(pIdx);
+      totalPoints++;
+    });
+  });
+
+  document.getElementById('s-total').textContent = DATA.total.toLocaleString();
+  document.getElementById('s-points').textContent = totalPoints.toLocaleString();
+  document.getElementById('s-max').textContent = DATA.duplicates[0]?.count || '—';
+
+  maxCount = DATA.duplicates[0]?.count || 2;
+
+  deckgl = new deck.DeckGL({
+    container: 'deck-canvas',
+    mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    initialViewState: {
+      longitude: -71.06, latitude: 42.33, zoom: 10.5, pitch: 0, bearing: 0,
+    },
+    controller: true,
+    onHover: onHover,
+    onClick: onClick,
+    layers: buildLayers(),
+  });
+
+  renderList(DATA.duplicates);
+  setupUI();
+  document.getElementById('loading').classList.add('hidden');
+}
+
+// Color ramp: low count (cool blue) -> mid (yellow) -> high count (hot red)
+function countToColor(count, maxCount) {
+  const t = Math.min((count - 2) / (maxCount - 2), 1); // normalize 2..max to 0..1
+  let r, g, b;
+  if (t < 0.25) {
+    // blue -> cyan
+    const s = t / 0.25;
+    r = 30; g = 80 + s * 140; b = 200 - s * 40;
+  } else if (t < 0.5) {
+    // cyan -> yellow
+    const s = (t - 0.25) / 0.25;
+    r = 30 + s * 220; g = 220; b = 160 - s * 160;
+  } else if (t < 0.75) {
+    // yellow -> orange
+    const s = (t - 0.5) / 0.25;
+    r = 250; g = 220 - s * 100; b = s * 10;
+  } else {
+    // orange -> red
+    const s = (t - 0.75) / 0.25;
+    r = 250 - s * 30; g = 120 - s * 80; b = 10;
+  }
+  return [Math.round(r), Math.round(g), Math.round(b)];
+}
+
+let maxCount = 2;
+
+function buildLayers() {
+  const active = lockedAddress || highlightedAddress;
+
+  const bgLayer = new deck.ScatterplotLayer({
+    id: 'addresses-bg',
+    data: points,
+    getPosition: d => d.position,
+    getRadius: 25 + 20,
+    getFillColor: d => {
+      if (active) return [80, 80, 80, 18];
+      const baseColor = countToColor(d.count, maxCount);
+      return [...baseColor, 160];
+    },
+    radiusMinPixels: 2,
+    radiusMaxPixels: 20,
+    pickable: !active, // only pickable when nothing is selected
+    autoHighlight: false,
+    updateTriggers: {
+      getFillColor: active,
+    },
+    transitions: { getFillColor: 150 },
+  });
+
+  if (!active) return [bgLayer];
+
+  // Filter to just the selected address points
+  const selectedPoints = points.filter(d => d.address === active);
+
+  const fgLayer = new deck.ScatterplotLayer({
+    id: 'addresses-fg',
+    data: selectedPoints,
+    getPosition: d => d.position,
+    getRadius: 300,
+    getFillColor: d => {
+      const baseColor = countToColor(d.count, maxCount);
+      return [...baseColor, 255];
+    },
+    radiusMinPixels: 8,
+    radiusMaxPixels: 40,
+    pickable: true,
+    autoHighlight: false,
+    // Outlined ring effect
+    stroked: true,
+    getLineColor: [255, 255, 255, 180],
+    getLineWidth: 2,
+    lineWidthUnits: 'pixels',
+    updateTriggers: {
+      getFillColor: active,
+    },
+    transitions: { getRadius: 200, getFillColor: 150 },
+  });
+
+  return [bgLayer, fgLayer];
+}
+
+function updateLayer() {
+  if (deckgl) deckgl.setProps({ layers: buildLayers() });
+}
+
+function onHover(info) {
+  if (lockedAddress) return; // Don't change highlight while locked
+  const tooltip = document.getElementById('tooltip');
+  if (info.object) {
+    const d = info.object;
+    if (d.address !== highlightedAddress) {
+      highlightedAddress = d.address;
+      updateLayer();
+      showDetail(d.address);
+    }
+    document.getElementById('tooltip-address').textContent = d.address;
+    const entry = DATA.duplicates[d.aIdx];
+    const cities = [...new Set(entry.locations.map(l => l.city))];
+    document.getElementById('tooltip-detail').textContent = `${entry.count} locations · ${cities.join(', ')}`;
+    tooltip.style.left = (info.x + 14) + 'px';
+    tooltip.style.top = (info.y - 14) + 'px';
+    tooltip.classList.add('visible');
+  } else {
+    if (highlightedAddress) { highlightedAddress = null; updateLayer(); hideDetail(); }
+    tooltip.classList.remove('visible');
+  }
+}
+
+function onClick(info) {
+  document.getElementById('tooltip').classList.remove('visible');
+  if (info.object) {
+    const d = info.object;
+    if (lockedAddress === d.address) {
+      // Clicking same address again — unlock
+      lockedAddress = null;
+      highlightedAddress = null;
+      updateLayer();
+      hideDetail();
+    } else {
+      // Lock to this address
+      lockedAddress = d.address;
+      highlightedAddress = null;
+      updateLayer();
+      showDetail(d.address);
+      flyToAddress(DATA.duplicates[d.aIdx]);
+    }
+  } else {
+    // Clicked empty space — unlock
+    if (lockedAddress) {
+      lockedAddress = null;
+      highlightedAddress = null;
+      updateLayer();
+      hideDetail();
+    }
+  }
+}
+
+function flyToAddress(entry) {
+  if (!entry.locations.length) return;
+  const lons = entry.locations.map(l => l.lon).filter(Boolean);
+  const lats = entry.locations.map(l => l.lat).filter(Boolean);
+  if (!lons.length || !lats.length) return;
+
+  const cLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+  const cLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const spreadLon = Math.max(...lons) - Math.min(...lons);
+  const spreadLat = Math.max(...lats) - Math.min(...lats);
+  const spread = Math.max(spreadLon, spreadLat);
+
+  // Smooth zoom calculation with a hard cap at 13
+  let zoom;
+  if (spread > 1) zoom = 8;
+  else if (spread > 0.5) zoom = 9;
+  else if (spread > 0.2) zoom = 10;
+  else if (spread > 0.08) zoom = 11;
+  else if (spread > 0.03) zoom = 11.5;
+  else zoom = 12; // Never zoom closer than 12, even for nearby points
+
+  deckgl.setProps({
+    initialViewState: { longitude: cLon, latitude: cLat, zoom, pitch: 0, bearing: 0, transitionDuration: 1500 }
+  });
+}
+
+function showDetail(address) {
+  const entry = DATA.duplicates.find(d => d.address === address);
+  if (!entry) return;
+  document.getElementById('detail-title').textContent = entry.address;
+  const cc = countToColor(entry.count, maxCount);
+  const colorHex = `rgb(${cc[0]},${cc[1]},${cc[2]})`;
+  document.getElementById('detail-locations').innerHTML = entry.locations.map((loc, i) => `
+    <div class="detail-location" data-lat="${loc.lat}" data-lon="${loc.lon}" style="cursor:pointer;">
+      <div class="detail-dot" style="background:${colorHex}"></div>
+      <span class="detail-city">${loc.city}</span>
+      <span class="detail-zip">${loc.postcode}</span>
+    </div>
+  `).join('');
+
+  // Add click handlers to each location row
+  document.querySelectorAll('#detail-locations .detail-location').forEach(el => {
+    el.addEventListener('click', () => {
+      const lat = parseFloat(el.dataset.lat);
+      const lon = parseFloat(el.dataset.lon);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        deckgl.setProps({
+          initialViewState: {
+            longitude: lon, latitude: lat, zoom: 13,
+            pitch: 0, bearing: 0, transitionDuration: 2000,
+          }
+        });
+      }
+    });
+  });
+  document.getElementById('detail-card').classList.add('visible');
+  document.querySelectorAll('.panel-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.address === address);
+  });
+}
+
+function hideDetail() {
+  document.getElementById('detail-card').classList.remove('visible');
+  document.querySelectorAll('.panel-item').forEach(el => el.classList.remove('active'));
+}
+
+function renderList(items) {
+  const list = document.getElementById('panel-list');
+  list.innerHTML = '';
+  items.slice(0, 500).forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'panel-item';
+    div.dataset.address = entry.address;
+    const cities = [...new Set(entry.locations.map(l => l.city))];
+    div.innerHTML = `
+      <div class="panel-item-address">${entry.address}</div>
+      <div class="panel-item-meta"><em>${entry.count}×</em> &middot; ${cities.join(', ')}</div>
+    `;
+    div.addEventListener('click', () => {
+      if (lockedAddress === entry.address) {
+        lockedAddress = null;
+        highlightedAddress = null;
+        updateLayer();
+        hideDetail();
+      } else {
+        lockedAddress = entry.address;
+        highlightedAddress = null;
+        updateLayer();
+        showDetail(entry.address);
+        flyToAddress(entry);
+      }
+    });
+    list.appendChild(div);
+  });
+  document.getElementById('panel-footer').textContent = items.length > 500
+    ? `Showing 500 of ${items.length.toLocaleString()}. Search to filter.`
+    : `${items.length.toLocaleString()} addresses`;
+}
+
+function setupUI() {
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.toUpperCase();
+    renderList(DATA.duplicates.filter(d => d.address.includes(q)));
+  });
+  document.getElementById('panel-close').addEventListener('click', () => document.getElementById('panel').classList.add('collapsed'));
+  document.getElementById('panel-toggle').addEventListener('click', () => document.getElementById('panel').classList.remove('collapsed'));
+}
+
+init();
+</script>
+</body>
+</html>
