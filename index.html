@@ -287,7 +287,6 @@ async function init() {
   });
 
   document.getElementById('s-total').textContent = DATA.total.toLocaleString();
-  document.getElementById('s-points').textContent = totalPoints.toLocaleString();
   document.getElementById('s-max').textContent = DATA.duplicates[0]?.count || '—';
 
   maxCount = DATA.duplicates[0]?.count || 2;
