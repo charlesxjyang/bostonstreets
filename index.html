@@ -213,12 +213,8 @@
 <div class="masthead">
   <div class="masthead-rule"></div>
   <h1>Lost in Boston</h1>
-  <div class="dek">Mapping the duplicate street addresses of Greater Boston</div>
+  <div class="dek">Mapping the <span id="s-total">—</span> duplicated addresses of Greater Boston</div>
   <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a8578; margin-top: 8px; pointer-events: auto;">By <a href="https://charlesyang.io" target="_blank" style="color: #f4f1eb; text-decoration: none; border-bottom: 1px solid #8a8578;">Charles Yang</a></div>
-  <div class="stat-bar">
-    <div class="stat-block"><div class="stat-num" id="s-total">—</div><div class="stat-label">Duplicate addresses</div></div>
-    <div class="stat-block"><div class="stat-num" id="s-max">—</div><div class="stat-label">Most duplicated Address</div></div>
-  </div>
 </div>
 
 <div class="panel" id="panel">
@@ -287,7 +283,6 @@ async function init() {
   });
 
   document.getElementById('s-total').textContent = DATA.total.toLocaleString();
-  document.getElementById('s-max').textContent = DATA.duplicates[0]?.count || '—';
 
   maxCount = DATA.duplicates[0]?.count || 2;
 
