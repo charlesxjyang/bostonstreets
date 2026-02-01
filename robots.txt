@@ -1,0 +1,8 @@
+# robots.txt for Lost in Boston
+# https://charlesyang.io/bostonstreets/
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://charlesyang.io/bostonstreets/sitemap.xml

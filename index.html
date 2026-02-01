@@ -4,14 +4,57 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Lost in Boston - Mapping the Duplicate Street Addresses of Greater Boston</title>
-<meta property="og:title" content="Lost in Boston">
-<meta property="og:description" content="Mapping the Duplicate Street Addresses of Greater Boston">
-<meta property="og:image" content="https://charlesyang.io/bostonstreets/assets/og-preview.png">
+
+<!-- Standard SEO Meta Tags -->
+<meta name="description" content="An interactive map exploring over 23,000 duplicate street addresses across Greater Boston. Discover how the same address can exist in multiple towns.">
+<meta name="author" content="Charles Yang">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="canonical" href="https://charlesyang.io/bostonstreets/">
+
+<!-- Open Graph / Facebook -->
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://charlesyang.io/bostonstreets/">
+<meta property="og:site_name" content="Lost in Boston">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Lost in Boston - Mapping Duplicate Street Addresses">
+<meta property="og:description" content="An interactive map exploring over 23,000 duplicate street addresses across Greater Boston. Discover how the same address can exist in multiple towns.">
+<meta property="og:image" content="https://charlesyang.io/bostonstreets/assets/og-preview.png">
+<meta property="og:image:width" content="2952">
+<meta property="og:image:height" content="1588">
+
+<!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Lost in Boston">
-<meta name="twitter:description" content="Mapping the Duplicate Street Addresses of Greater Boston">
+<meta name="twitter:title" content="Lost in Boston - Mapping Duplicate Street Addresses">
+<meta name="twitter:description" content="An interactive map exploring over 23,000 duplicate street addresses across Greater Boston. Discover how the same address can exist in multiple towns.">
 <meta name="twitter:image" content="https://charlesyang.io/bostonstreets/assets/og-preview.png">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Lost in Boston",
+  "description": "An interactive map exploring over 23,000 duplicate street addresses across Greater Boston. Discover how the same address can exist in multiple towns.",
+  "url": "https://charlesyang.io/bostonstreets/",
+  "applicationCategory": "Data Visualization",
+  "operatingSystem": "Any",
+  "author": {
+    "@type": "Person",
+    "name": "Charles Yang",
+    "url": "https://charlesyang.io"
+  },
+  "image": "https://charlesyang.io/bostonstreets/assets/og-preview.png",
+  "about": {
+    "@type": "Place",
+    "name": "Greater Boston",
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 42.3601,
+      "longitude": -71.0589
+    }
+  }
+}
+</script>
 <script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
