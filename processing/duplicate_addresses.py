@@ -54,7 +54,7 @@ def normalize_street(street):
         parts[-1] = SUFFIX_MAP[last]
     return " ".join(parts)
 
-MIN_DISTANCE_MILES = 0.2
+MIN_DISTANCE_MILES = 0.4
 
 input_file = "data/greater_boston.geojson"
 output_file = "data/duplicate_addresses.json"

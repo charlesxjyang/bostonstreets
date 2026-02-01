@@ -1,5 +1,13 @@
 import json
 from collections import defaultdict
+from math import radians, cos, sin, sqrt, atan2
+
+def haversine_miles(lat1, lon1, lat2, lon2):
+    R = 3959
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
 SUFFIX_MAP = {
     "STREET": "ST", "STREETS": "ST",
@@ -46,9 +54,12 @@ def normalize_street(street):
         parts[-1] = SUFFIX_MAP[last]
     return " ".join(parts)
 
+MIN_DISTANCE_MILES = 0.3
+
 input_file = "data/greater_boston.geojson"
 output_file = "data/duplicate_addresses.json"
 
+# Group by address + city
 city_address_groups = defaultdict(list)
 
 with open(input_file, "r") as f:
@@ -77,7 +88,8 @@ with open(input_file, "r") as f:
             "lon": coords[0],
             "lat": coords[1],
         })
-        
+
+# Manually add missing addresses
 manual_entries = [
     {
         "number": "100",
@@ -98,27 +110,51 @@ for entry in manual_entries:
         "lat": entry["lat"],
     })
 
-# Dedupe: one entry per unique city+zip combo
+# Dedupe: within each city, first split by zip, then within same zip cluster by distance
 address_groups = defaultdict(list)
 
 for key, locations in city_address_groups.items():
     address, city = key.rsplit(" | ", 1)
 
-    seen_zips = set()
+    by_zip = defaultdict(list)
     for loc in locations:
-        if loc["postcode"] and loc["postcode"] not in seen_zips:
-            seen_zips.add(loc["postcode"])
-            address_groups[address].append(loc)
-        elif not loc["postcode"]:
-            address_groups[address].append(loc)
+        by_zip[loc["postcode"]].append(loc)
 
+    for postcode, zip_locs in by_zip.items():
+        if not postcode:
+            address_groups[address].append(zip_locs[0])
+            continue
+
+        # Within same zip, cluster by distance
+        clusters = []
+        for loc in zip_locs:
+            if loc["lat"] is None or loc["lon"] is None:
+                continue
+            placed = False
+            for cluster in clusters:
+                rep = cluster[0]
+                if haversine_miles(rep["lat"], rep["lon"], loc["lat"], loc["lon"]) < MIN_DISTANCE_MILES:
+                    placed = True
+                    break
+            if not placed:
+                clusters.append([loc])
+
+        for cluster in clusters:
+            address_groups[address].append(cluster[0])
+
+# Keep addresses with 2+ distinct locations
 dupes = []
 for address, locations in address_groups.items():
     if len(locations) >= 2:
         dupes.append({
             "address": address,
             "count": len(locations),
-            "locations": locations,
+            "locations": [{
+                "city": loc["city"],
+                "postcode": loc["postcode"],
+                "lon": round(loc["lon"], 4) if loc["lon"] is not None else None,
+                "lat": round(loc["lat"], 4) if loc["lat"] is not None else None,
+            } for loc in locations],
         })
 
 dupes.sort(key=lambda x: x["count"], reverse=True)
@@ -129,9 +165,12 @@ output = {
 }
 
 with open(output_file, "w") as f:
-    json.dump(output, f)
+    json.dump(output, f, separators=(',', ':'))
 
-print(f"Saved {len(dupes)} duplicate addresses to {output_file}")
+import os
+size_mb = os.path.getsize(output_file) / 1024 / 1024
+print(f"Saved {len(dupes)} duplicate addresses to {output_file} ({size_mb:.1f} MB)")
+
 print(f"\nTop 20:")
 for d in dupes[:20]:
     cities = [f"{loc['city']} {loc['postcode']}" for loc in d["locations"]]
